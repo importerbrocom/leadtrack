@@ -1,0 +1,22 @@
+# Admin panel hardening
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "same-origin"
+</IfModule>
+
+# Shared includes must never be requested directly
+<FilesMatch "^(_init)\.php$">
+    Require all denied
+</FilesMatch>
+
+<FilesMatch "\.(sql|log|ini|md|bak)$">
+    Require all denied
+</FilesMatch>
+
+# The partials directory is include-only
+RedirectMatch 403 ^/admin/partials/.*$
+
+DirectoryIndex index.php
+Options -Indexes
