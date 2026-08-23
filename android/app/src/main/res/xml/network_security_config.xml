@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  HTTPS only by default: candidate data and passport scans travel over this
+  connection, so plain HTTP is refused.
+
+  If your cPanel domain does not have SSL yet (get a free Let's Encrypt
+  certificate from cPanel > SSL/TLS Status - it takes a minute), you can
+  temporarily allow cleartext for your own domain by uncommenting the block
+  below and putting your domain in it. Do not ship it that way.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!--
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">yourdomain.com</domain>
+    </domain-config>
+    -->
+
+    <!-- Lets you test against a dev machine on the same wifi. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">localhost</domain>
+    </domain-config>
+</network-security-config>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lead Manager</string>
+
+    <string name="channel_call_capture_name">Call tracking</string>
+    <string name="channel_call_capture_desc">Keeps call logging running while you are on a call</string>
+    <string name="channel_reminders_name">Callback reminders</string>
+    <string name="channel_reminders_desc">Reminds you when it is time to call a lead back</string>
+    <string name="channel_general_name">Updates</string>
+    <string name="channel_general_desc">New leads, document approvals and other updates</string>
+</resources>
