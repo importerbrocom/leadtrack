@@ -47,7 +47,12 @@ final class Router
             exit;
         }
 
-        foreach ($this->routes[$method] ?? [] as $route) {
+        // HEAD must behave like GET. Uptime monitors and some proxies send HEAD
+        // by default, and answering 405 to them looks like an outage. PHP drops
+        // the response body for HEAD requests by itself.
+        $lookup = $method === 'HEAD' ? 'GET' : $method;
+
+        foreach ($this->routes[$lookup] ?? [] as $route) {
             if (preg_match($route['pattern'], $path, $matches)) {
                 array_shift($matches);
                 $params = [];
@@ -65,7 +70,7 @@ final class Router
 
         // Path exists but with a different verb? Report 405 rather than 404.
         foreach ($this->routes as $verb => $routes) {
-            if ($verb === $method) {
+            if ($verb === $lookup) {
                 continue;
             }
             foreach ($routes as $route) {
