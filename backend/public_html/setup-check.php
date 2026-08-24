@@ -53,10 +53,17 @@ if ($rewrite === true) {
 }
 
 // ---------------------------------------------------------------- HTTPS
-$https = (($_SERVER['HTTPS'] ?? '') !== '' && $_SERVER['HTTPS'] !== 'off')
-    || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
-check($checks, $https ? 'pass' : 'fail', 'HTTPS', $https ? 'yes' : 'no - served over plain HTTP',
-    $https ? '' : 'Run AutoSSL in cPanel > SSL/TLS Status. The Android app refuses plain HTTP.');
+$isCli = PHP_SAPI === 'cli';
+
+if ($isCli) {
+    check($checks, 'warn', 'HTTPS', 'cannot be checked from the command line',
+        'Re-run this in a browser once DNS resolves.');
+} else {
+    $https = (($_SERVER['HTTPS'] ?? '') !== '' && $_SERVER['HTTPS'] !== 'off')
+        || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
+    check($checks, $https ? 'pass' : 'fail', 'HTTPS', $https ? 'yes' : 'no - served over plain HTTP',
+        $https ? '' : 'Run AutoSSL in cPanel > SSL/TLS Status. The Android app refuses plain HTTP.');
+}
 
 // ---------------------------------------------------------------- app code
 $bootstrapPath = null;
@@ -191,6 +198,54 @@ if ($appRoot !== null) {
 
 $fails = count(array_filter($checks, fn($c) => $c['status'] === 'fail'));
 $warns = count(array_filter($checks, fn($c) => $c['status'] === 'warn'));
+
+/**
+ * Plain-text output when run from the shell:
+ *
+ *     php ~/yourdomain/setup-check.php
+ *
+ * This is how you validate a deployment before DNS resolves, which is exactly
+ * when you most need to know whether the paths and database are right.
+ */
+if ($isCli) {
+    $colour = static function (string $status, string $text): string {
+        if (getenv('NO_COLOR') !== false || !stream_isatty(STDOUT)) {
+            return $text;
+        }
+        $codes = ['pass' => '0;32', 'fail' => '0;31', 'warn' => '0;33'];
+
+        return "\033[" . ($codes[$status] ?? '0') . "m{$text}\033[0m";
+    };
+
+    echo PHP_EOL . 'Lead Manager - setup check   (PHP ' . PHP_VERSION . ' CLI)' . PHP_EOL;
+    echo str_repeat('-', 64) . PHP_EOL;
+
+    foreach ($checks as $c) {
+        $mark = match ($c['status']) {
+            'pass' => '[ OK ]',
+            'warn' => '[warn]',
+            default => '[FAIL]',
+        };
+
+        echo $colour($c['status'], $mark) . ' ' . str_pad($c['label'], 28) . ' ' . $c['detail'] . PHP_EOL;
+
+        if ($c['fix'] !== '') {
+            echo '       -> ' . $c['fix'] . PHP_EOL;
+        }
+    }
+
+    echo str_repeat('-', 64) . PHP_EOL;
+
+    if ($fails === 0) {
+        echo $colour('pass', 'Everything required is in place.');
+        echo $warns > 0 ? " ({$warns} warning(s))" : '';
+        echo PHP_EOL . 'Next: open /admin/ in a browser once DNS resolves.' . PHP_EOL . PHP_EOL;
+    } else {
+        echo $colour('fail', "{$fails} problem(s) must be fixed.") . PHP_EOL . PHP_EOL;
+    }
+
+    exit($fails === 0 ? 0 : 1);
+}
 ?>
 <!doctype html>
 <html lang="en">
