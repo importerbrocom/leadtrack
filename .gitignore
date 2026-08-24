@@ -20,6 +20,8 @@ android/.cxx/
 *.aab
 *.keystore
 *.jks
+# Signing key + passwords. Never commit these.
+android/keystore.properties
 !android/gradle/wrapper/gradle-wrapper.jar
 
 # OS / editor noise
