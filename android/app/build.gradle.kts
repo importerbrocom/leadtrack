@@ -23,7 +23,7 @@ android {
         //  Must end with a trailing slash. HTTPS is strongly recommended -
         //  passport scans and candidate data travel over this connection.
         // ---------------------------------------------------------------
-        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://yourdomain.com/api/\"")
+        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://leadtrack.nokkoo.in/api/\"")
 
         vectorDrawables.useSupportLibrary = true
     }

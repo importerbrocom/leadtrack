@@ -129,7 +129,7 @@ final class LeadController
         ], Database::all(
             'SELECT c.*, u.name AS user_name FROM call_logs c
               LEFT JOIN users u ON u.id = c.user_id
-             WHERE c.lead_id = ? ORDER BY c.started_at DESC LIMIT 100',
+             WHERE c.lead_id = ? ORDER BY c.started_at DESC, c.id DESC LIMIT 100',
             [$id]
         ));
 
@@ -142,7 +142,7 @@ final class LeadController
         ], Database::all(
             'SELECT h.*, u.name AS user_name FROM lead_status_history h
               LEFT JOIN users u ON u.id = h.user_id
-             WHERE h.lead_id = ? ORDER BY h.created_at DESC LIMIT 100',
+             WHERE h.lead_id = ? ORDER BY h.created_at DESC, h.id DESC LIMIT 100',
             [$id]
         ));
 

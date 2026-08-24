@@ -22,6 +22,18 @@ check() {
 
 section() { printf '\n\033[1;36m== %s\033[0m\n' "$1"; }
 
+# Writes a small valid PDF to $1. Real deployments only accept PDFs, images and
+# Office files, so the tests must upload something the allowlist really permits.
+make_pdf() {
+  printf '%%PDF-1.4\n' > "$1"
+  printf '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n' >> "$1"
+  printf '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' >> "$1"
+  printf '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 300]>>endobj\n' >> "$1"
+  printf '%% %s\n' "$2" >> "$1"
+  printf 'trailer<</Root 1 0 R>>\n%%%%EOF\n' >> "$1"
+}
+
+
 # present "label" "count"   -> passes when the count is 1 or more
 present() {
   if [[ "${2:-0}" -ge 1 ]]; then
@@ -139,8 +151,8 @@ present "duplicate lead phone refused" \
   "$(curl -s -b "$JAR" -c "$JAR" "${BASE}/leads.php" | grep -c 'already saved as lead')"
 
 # form template upload + download
-TPL=$(mktemp /tmp/panel-form-XXXX.txt)
-echo "PANEL UPLOADED APPLICATION FORM" > "$TPL"
+TPL=$(mktemp /tmp/panel-form-XXXX.pdf)
+make_pdf "$TPL" "PANEL UPLOADED APPLICATION FORM"
 TOKEN=$(csrf_of "${BASE}/templates.php")
 check "upload form template" \
   "$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" \
@@ -151,7 +163,7 @@ check "upload form template" \
 # by category/title, so "first link on the page" is not ours).
 TPL_ID=$(curl -s -b "$JAR" -c "$JAR" "${BASE}/templates.php" \
   | grep -o 'type=template&id=[0-9]*' | grep -o '[0-9]*$' | sort -n | tail -1)
-DL=$(mktemp /tmp/panel-dl-XXXX.txt)
+DL=$(mktemp /tmp/panel-dl-XXXX.pdf)
 check "download the template back" \
   "$(curl -s -o "$DL" -w '%{http_code}' -b "$JAR" -c "$JAR" "${BASE}/download.php?type=template&id=${TPL_ID}")" "200"
 check "downloaded bytes match" "$(diff -q "$TPL" "$DL" >/dev/null && echo same || echo differs)" "same"

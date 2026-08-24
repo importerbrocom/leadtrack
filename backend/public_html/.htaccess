@@ -1,0 +1,23 @@
+# Document-root rules.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Visiting the bare domain lands on the head-office panel.
+    RewriteRule ^$ admin/ [L,R=302]
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+</IfModule>
+
+# Internal plumbing must never be requested directly.
+<FilesMatch "^(bootstrap-locator|app-path)\.php$">
+    Require all denied
+</FilesMatch>
+
+<FilesMatch "\.(sql|log|ini|md|bak|env)$">
+    Require all denied
+</FilesMatch>
+
+Options -Indexes

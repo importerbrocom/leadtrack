@@ -9,7 +9,9 @@
 
 declare(strict_types=1);
 
-require dirname(__DIR__, 2) . '/app/bootstrap.php';
+// Works whether public_html/ is part of the project or a separate cPanel
+// document root. See bootstrap-locator.php.
+require (require dirname(__DIR__) . '/bootstrap-locator.php');
 
 use App\Controllers\AuthController;
 use App\Controllers\CallController;

@@ -277,7 +277,7 @@ final class ProjectController
         ], Database::all(
             'SELECT h.*, u.name AS user_name FROM project_status_history h
               LEFT JOIN users u ON u.id = h.user_id
-             WHERE h.project_id = ? ORDER BY h.created_at DESC',
+             WHERE h.project_id = ? ORDER BY h.created_at DESC, h.id DESC',
             [$id]
         ));
 

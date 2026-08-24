@@ -71,6 +71,18 @@ checkne() { # non-empty
 
 section() { printf '\n\033[1;36m== %s\033[0m\n' "$1"; }
 
+# Writes a small valid PDF to $1. Real deployments only accept PDFs, images and
+# Office files, so the tests must upload something the allowlist really permits.
+make_pdf() {
+  printf '%%PDF-1.4\n' > "$1"
+  printf '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n' >> "$1"
+  printf '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' >> "$1"
+  printf '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 300]>>endobj\n' >> "$1"
+  printf '%% %s\n' "$2" >> "$1"
+  printf 'trailer<</Root 1 0 R>>\n%%%%EOF\n' >> "$1"
+}
+
+
 STAMP=$(date +%s)
 
 # ---------------------------------------------------------------- 1. health
@@ -179,8 +191,8 @@ checkne "callback appears in follow-ups" "$FU_TOTAL"
 
 # ---------------------------------------------------------------- 6. form templates
 section "Form templates (admin uploads, field team downloads)"
-TPL_FILE=$(mktemp /tmp/application-form-XXXX.txt)
-echo "CANDIDATE APPLICATION FORM - name, passport, job preference" > "$TPL_FILE"
+TPL_FILE=$(mktemp /tmp/application-form-XXXX.pdf)
+make_pdf "$TPL_FILE" "CANDIDATE APPLICATION FORM - name, passport, job preference"
 
 TPL_ID=$(curl -s -X POST "${BASE_URL}/form-templates" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
@@ -193,15 +205,15 @@ checkne "admin uploaded template" "$TPL_ID"
 check "telecaller cannot upload template" \
   "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${BASE_URL}/form-templates" -H "Authorization: Bearer $TC_TOKEN" -F "file=@${TPL_FILE}" -F "title=Nope")" "403"
 
-DL=$(mktemp /tmp/downloaded-XXXX.txt)
+DL=$(mktemp /tmp/downloaded-XXXX.pdf)
 DL_CODE=$(curl -s -o "$DL" -w '%{http_code}' "${BASE_URL}/form-templates/${TPL_ID}/download" -H "Authorization: Bearer $TC_TOKEN")
 check "telecaller downloaded template" "$DL_CODE" "200"
 check "downloaded content matches"     "$(diff -q "$TPL_FILE" "$DL" >/dev/null && echo same || echo differs)" "same"
 
 # ---------------------------------------------------------------- 7. documents
 section "Documents (field team uploads, admin verifies)"
-DOC_FILE=$(mktemp /tmp/filled-form-XXXX.txt)
-echo "FILLED FORM: Rajesh Kumar / Passport M1234567 / Electrician" > "$DOC_FILE"
+DOC_FILE=$(mktemp /tmp/filled-form-XXXX.pdf)
+make_pdf "$DOC_FILE" "FILLED FORM: Rajesh Kumar / Passport M1234567 / Electrician"
 
 APP_FORM_TYPE=$(call GET /document-types '' "$TC_TOKEN" | python3 -c "
 import json,sys
@@ -221,7 +233,7 @@ checkne "telecaller uploaded document" "$DOC_ID"
 DOC_STATUS=$(call GET "/documents?lead_id=$LEAD_ID" '' "$TC_TOKEN" | jsonget data.0.verification_status)
 check "document starts pending" "$DOC_STATUS" "pending"
 
-ADMIN_DL=$(mktemp /tmp/admin-doc-XXXX.txt)
+ADMIN_DL=$(mktemp /tmp/admin-doc-XXXX.pdf)
 ADMIN_DL_CODE=$(curl -s -o "$ADMIN_DL" -w '%{http_code}' "${BASE_URL}/documents/${DOC_ID}/download" -H "Authorization: Bearer $ADMIN_TOKEN")
 check "admin downloaded document"  "$ADMIN_DL_CODE" "200"
 check "admin got the right bytes"  "$(diff -q "$DOC_FILE" "$ADMIN_DL" >/dev/null && echo same || echo differs)" "same"
