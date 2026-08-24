@@ -7,7 +7,7 @@ Kotlin + Jetpack Compose. Records calls automatically and works offline.
 ```bash
 echo "sdk.dir=/path/to/Android/sdk" > local.properties
 ./gradlew assembleDebug      # app/build/outputs/apk/debug/
-./gradlew assembleRelease    # app/build/outputs/apk/release/ (unsigned)
+./gradlew assembleRelease    # app/build/outputs/apk/release/
 ```
 
 Set your server before building a release APK, in `app/build.gradle.kts`:
@@ -16,7 +16,17 @@ Set your server before building a release APK, in `app/build.gradle.kts`:
 buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://yourdomain.com/api/\"")
 ```
 
-Signing and distribution: see [../docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md).
+**Signing.** An unsigned APK will not install. Copy
+`keystore.properties.example` to `keystore.properties` (git-ignored) and point it
+at your keystore; `assembleRelease` then produces a signed
+`leadtrack-<version>-release.apk`. Without that file the build still succeeds but
+the APK is unsigned.
+
+Back the keystore up: lose it and you can never update the app on phones that
+already have it installed.
+
+Full instructions and distribution options: see
+[../docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md).
 
 ## Requirements
 

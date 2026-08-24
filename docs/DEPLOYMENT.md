@@ -183,33 +183,43 @@ The APK lands in `app/build/outputs/apk/release/`.
 
 ### 3. Sign it for real distribution
 
-The release build is unsigned. Create a keystore once:
+An unsigned APK cannot be installed, so signing is not optional.
+
+Create a keystore once:
 
 ```bash
-keytool -genkey -v -keystore leadmanager.keystore \
-        -alias leadmanager -keyalg RSA -keysize 2048 -validity 10000
+keytool -genkeypair -v \
+  -keystore leadtrack-release.keystore \
+  -alias leadtrack \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -dname "CN=Your Agency, O=Your Agency, L=Kochi, ST=Kerala, C=IN"
 ```
 
-Keep that file and its password safe — you need the same key to ship updates.
-Then add to `android/app/build.gradle.kts`:
+Then copy `android/keystore.properties.example` to
+`android/keystore.properties` and fill it in:
 
-```kotlin
-android {
-    signingConfigs {
-        create("release") {
-            storeFile = file("/absolute/path/leadmanager.keystore")
-            storePassword = "…"
-            keyAlias = "leadmanager"
-            keyPassword = "…"
-        }
-    }
-    buildTypes {
-        getByName("release") {
-            signingConfig = signingConfigs.getByName("release")
-        }
-    }
-}
+```properties
+storeFile=/absolute/path/to/leadtrack-release.keystore
+storePassword=…
+keyAlias=leadtrack
+keyPassword=…
 ```
+
+That file is git-ignored, so the key and its password never reach the
+repository. `./gradlew assembleRelease` will now produce a signed
+`leadtrack-<version>-release.apk`. Confirm it before handing it out:
+
+```bash
+apksigner verify --print-certs app/build/outputs/apk/release/leadtrack-1.0.0-release.apk
+```
+
+> ⚠️ **Back up the keystore and its password, in more than one place.**
+> Android identifies an app by its signing key. Lose the keystore and you can
+> never update the app on phones that already have it — everyone would have to
+> uninstall and reinstall. There is no recovery process.
+
+If `keystore.properties` is missing the build still succeeds, but the APK comes
+out unsigned — useful for CI, useless for a phone.
 
 ### 4. Get it onto your team's phones
 
