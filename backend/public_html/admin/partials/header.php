@@ -35,6 +35,10 @@ $nav = [
     ['file' => 'users.php',     'label' => $isAdmin ? 'Partners & Team' : 'My Telecallers', 'icon' => 'people'],
 ];
 
+if ($isAdmin) {
+    $nav[] = ['file' => 'mobileapp.php', 'label' => 'Mobile App', 'icon' => 'phone'];
+}
+
 $current = basename($_SERVER['SCRIPT_NAME'] ?? 'index.php');
 ?>
 <!doctype html>

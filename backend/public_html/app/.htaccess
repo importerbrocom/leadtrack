@@ -1,0 +1,11 @@
+# Serve APKs as a download rather than letting the browser try to render them.
+AddType application/vnd.android.package-archive .apk
+
+<FilesMatch "\.apk$">
+    Header set Content-Disposition "attachment"
+    # APKs are large and change rarely; let phones cache them briefly.
+    Header set Cache-Control "public, max-age=3600"
+</FilesMatch>
+
+DirectoryIndex index.php
+Options -Indexes
