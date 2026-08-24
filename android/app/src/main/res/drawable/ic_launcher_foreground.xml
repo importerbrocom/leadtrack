@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Handset -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38.2,32.5c-1.2,-1.2 -3.1,-1.2 -4.3,0l-4.6,4.6c-2.1,2.1 -2.7,5.2 -1.6,7.9c4.6,11.2 13.6,20.2 24.8,24.8c2.7,1.1 5.8,0.5 7.9,-1.6l4.6,-4.6c1.2,-1.2 1.2,-3.1 0,-4.3l-7.3,-7.3c-1.2,-1.2 -3.1,-1.2 -4.3,0l-2.7,2.7c-3.9,-2.3 -7.2,-5.6 -9.5,-9.5l2.7,-2.7c1.2,-1.2 1.2,-3.1 0,-4.3z" />
+
+    <!-- Rising bars: the "lead pipeline" -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.85"
+        android:pathData="M64,44h5v20h-5z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.85"
+        android:pathData="M72,37h5v27h-5z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.85"
+        android:pathData="M80,30h5v34h-5z" />
+</vector>

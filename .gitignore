@@ -1,0 +1,33 @@
+# Never commit real credentials
+backend/config/config.php
+
+# Uploaded files and logs live on the server, not in git
+backend/storage/uploads/*
+!backend/storage/uploads/.gitkeep
+backend/storage/logs/*
+!backend/storage/logs/.gitkeep
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/captures/
+android/.externalNativeBuild/
+android/.cxx/
+*.apk
+*.aab
+*.keystore
+*.jks
+!android/gradle/wrapper/gradle-wrapper.jar
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+
+# Local Android SDK location (machine-specific)
+android/local.properties
