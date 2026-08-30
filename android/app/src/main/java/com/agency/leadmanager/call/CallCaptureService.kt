@@ -10,6 +10,7 @@ import com.agency.leadmanager.ServiceLocator
 import com.agency.leadmanager.data.repo.LeadLookupResult
 import com.agency.leadmanager.notif.Notifier
 import com.agency.leadmanager.sync.SyncScheduler
+import com.agency.leadmanager.ui.AppVisibility
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -99,6 +100,10 @@ class CallCaptureService : Service() {
         val lookup = locator.leadRepository.lookupByPhone(call.number)
         val leadId = (lookup as? LeadLookupResult.Found)?.leadId
 
+        // If the number is in the phonebook, use that name so the prompt can say
+        // "Is Rajesh a lead?" and saving becomes one tap.
+        val contactName = ContactLookup(this).nameFor(call.number)
+
         val pendingId = locator.callRepository.recordCall(
             deviceCallId = call.deviceCallId,
             phoneNumber = call.number,
@@ -117,26 +122,54 @@ class CallCaptureService : Service() {
 
         Log.d(TAG, "Captured ${call.direction} call, ${call.durationSec}s, lead=$leadId")
 
-        // Ask the popup for the outcome. Missed/rejected calls with no lead are
-        // not worth interrupting anyone for.
+        // Should we prompt at all?
+        //
+        // Dialling someone is intent, so every outgoing call is worth asking
+        // about even if they did not pick up. Incoming calls only count when
+        // answered, otherwise every spam call would raise a prompt.
         val worthAsking = when {
             lookup is LeadLookupResult.Found -> true
-            call.direction == "outgoing" && call.durationSec > 0 -> true
+            call.direction == "outgoing" -> true
             call.direction == "incoming" && call.durationSec > 0 -> true
             else -> false
         }
 
         if (worthAsking && pendingId > 0) {
-            PostCallActivity.launch(
-                context = this,
+            // A NOTIFICATION, not a window.
+            //
+            // Since Android 10 an app with no visible window may not start an
+            // activity from the background, and a call ending is precisely that
+            // situation - the popup was being silently discarded. The
+            // notification always arrives, and tapping it opens the full sheet
+            // (a user-initiated start, which is permitted).
+            Notifier(this).showPostCallPrompt(
                 pendingCallId = pendingId,
                 phoneNumber = call.number,
+                displayName = contactName,
                 durationSec = call.durationSec,
                 direction = call.direction,
                 leadId = leadId,
                 leadName = (lookup as? LeadLookupResult.Found)?.name,
                 leadStatus = (lookup as? LeadLookupResult.Found)?.status,
+                suggestedName = contactName,
             )
+
+            // If the app happens to be in the foreground the sheet can also be
+            // shown directly, which is a nicer experience. This is a bonus, not
+            // the mechanism we rely on.
+            if (AppVisibility.isForeground) {
+                PostCallActivity.launch(
+                    context = this,
+                    pendingCallId = pendingId,
+                    phoneNumber = call.number,
+                    durationSec = call.durationSec,
+                    direction = call.direction,
+                    leadId = leadId,
+                    leadName = (lookup as? LeadLookupResult.Found)?.name,
+                    leadStatus = (lookup as? LeadLookupResult.Found)?.status,
+                    contactName = contactName,
+                )
+            }
         }
 
         // Either way, get it to the server as soon as the network allows.

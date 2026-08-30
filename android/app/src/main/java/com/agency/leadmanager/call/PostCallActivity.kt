@@ -71,11 +71,15 @@ class PostCallActivity : ComponentActivity() {
         val leadId = intent.getLongExtra(EXTRA_LEAD_ID, -1L).takeIf { it > 0 }
         val leadName = intent.getStringExtra(EXTRA_LEAD_NAME)
         val leadStatus = intent.getStringExtra(EXTRA_LEAD_STATUS)
+        val contactName = intent.getStringExtra(EXTRA_CONTACT_NAME)
 
         if (pendingCallId <= 0) {
             finish()
             return
         }
+
+        // Opening the sheet answers the prompt, so clear the notification.
+        com.agency.leadmanager.notif.Notifier(this).cancelPostCallPrompt(pendingCallId)
 
         setContent {
             LeadManagerTheme {
@@ -86,6 +90,7 @@ class PostCallActivity : ComponentActivity() {
                     leadId = leadId,
                     leadName = leadName,
                     leadStatus = leadStatus,
+                    contactName = contactName,
                     onDismiss = { finish() },
                     onSave = { outcome ->
                         save(pendingCallId, leadId, phoneNumber, outcome)
@@ -154,6 +159,31 @@ class PostCallActivity : ComponentActivity() {
         private const val EXTRA_LEAD_ID = "lead_id"
         private const val EXTRA_LEAD_NAME = "lead_name"
         private const val EXTRA_LEAD_STATUS = "lead_status"
+        private const val EXTRA_CONTACT_NAME = "contact_name"
+
+        /** Built separately so a notification can carry it as a PendingIntent. */
+        fun intentFor(
+            context: Context,
+            pendingCallId: Long,
+            phoneNumber: String,
+            durationSec: Int,
+            direction: String,
+            leadId: Long?,
+            leadName: String?,
+            leadStatus: String?,
+            contactName: String?,
+        ): Intent = Intent(context, PostCallActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra(EXTRA_PENDING_CALL_ID, pendingCallId)
+            putExtra(EXTRA_PHONE, phoneNumber)
+            putExtra(EXTRA_DURATION, durationSec)
+            putExtra(EXTRA_DIRECTION, direction)
+            putExtra(EXTRA_LEAD_ID, leadId ?: -1L)
+            putExtra(EXTRA_LEAD_NAME, leadName)
+            putExtra(EXTRA_LEAD_STATUS, leadStatus)
+            putExtra(EXTRA_CONTACT_NAME, contactName)
+        }
 
         fun launch(
             context: Context,
@@ -164,20 +194,14 @@ class PostCallActivity : ComponentActivity() {
             leadId: Long?,
             leadName: String?,
             leadStatus: String?,
+            contactName: String? = null,
         ) {
-            val intent = Intent(context, PostCallActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                putExtra(EXTRA_PENDING_CALL_ID, pendingCallId)
-                putExtra(EXTRA_PHONE, phoneNumber)
-                putExtra(EXTRA_DURATION, durationSec)
-                putExtra(EXTRA_DIRECTION, direction)
-                putExtra(EXTRA_LEAD_ID, leadId ?: -1L)
-                putExtra(EXTRA_LEAD_NAME, leadName)
-                putExtra(EXTRA_LEAD_STATUS, leadStatus)
-            }
-
-            context.startActivity(intent)
+            context.startActivity(
+                intentFor(
+                    context, pendingCallId, phoneNumber, durationSec, direction,
+                    leadId, leadName, leadStatus, contactName
+                )
+            )
         }
     }
 }
@@ -200,6 +224,7 @@ private fun PostCallSheet(
     leadId: Long?,
     leadName: String?,
     leadStatus: String?,
+    contactName: String?,
     onDismiss: () -> Unit,
     onSave: (CallOutcome) -> Unit,
 ) {
@@ -209,7 +234,9 @@ private fun PostCallSheet(
     var status by remember { mutableStateOf<String?>(null) }
     var notes by remember { mutableStateOf("") }
     var callbackMillis by remember { mutableStateOf<Long?>(null) }
-    var newLeadName by remember { mutableStateOf("") }
+    // Pre-filled from the phonebook when the number is saved there, so the
+    // telecaller usually just taps Save.
+    var newLeadName by remember { mutableStateOf(contactName.orEmpty()) }
     var saving by remember { mutableStateOf(false) }
 
     val isKnownLead = leadId != null
@@ -269,15 +296,31 @@ private fun PostCallSheet(
 
                 if (!isKnownLead) {
                     Text(
-                        "This number is not saved as a lead. Add it?",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
+                        "Is this a lead?",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
                     )
-                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Saving adds it to the office system straight away.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = newLeadName,
                         onValueChange = { newLeadName = it },
                         label = { Text("Candidate name") },
+                        placeholder = { Text(PhoneUtils.formatForDisplay(phoneNumber)) },
+                        supportingText = {
+                            Text(
+                                if (contactName != null) {
+                                    "Taken from your contacts - edit if you like"
+                                } else {
+                                    "Leave blank to save it under the phone number"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -371,7 +414,16 @@ private fun PostCallSheet(
                             status = status,
                             notes = notes.trim().takeIf { it.isNotBlank() },
                             nextFollowUpAtMillis = callbackMillis,
-                            newLeadName = newLeadName.trim().takeIf { !isKnownLead && it.isNotBlank() },
+                            // For an unknown number always create the lead. An
+                            // empty box used to mean "discard", which quietly
+                            // lost the number - fall back to the phone number as
+                            // the name instead.
+                            newLeadName = if (isKnownLead) {
+                                null
+                            } else {
+                                newLeadName.trim().takeIf { it.isNotBlank() }
+                                    ?: PhoneUtils.formatForDisplay(phoneNumber)
+                            },
                         )
                     )
                 }
@@ -387,7 +439,9 @@ private fun PostCallSheet(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Skip") }
+            TextButton(onClick = onDismiss) {
+                Text(if (isKnownLead) "Skip" else "Not a lead")
+            }
         },
     )
 }

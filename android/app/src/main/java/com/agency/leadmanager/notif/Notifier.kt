@@ -32,6 +32,150 @@ class Notifier(private val context: Context) {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build()
 
+    /**
+     * The prompt shown the moment a call ends.
+     *
+     * This is a notification rather than a popup window on purpose: since
+     * Android 10, an app with no visible window is not allowed to launch an
+     * activity from the background, and a call ending is exactly that situation.
+     * A notification always gets through.
+     *
+     * For a number that is not yet a lead it offers a one-tap "Yes, it's a lead".
+     * For an existing lead it offers to log the outcome. Tapping the body always
+     * opens the full sheet (status, callback time, notes).
+     */
+    fun showPostCallPrompt(
+        pendingCallId: Long,
+        phoneNumber: String,
+        displayName: String?,
+        durationSec: Int,
+        direction: String,
+        leadId: Long?,
+        leadName: String?,
+        leadStatus: String?,
+        suggestedName: String?,
+    ) {
+        val isKnownLead = leadId != null
+        val who = leadName ?: displayName ?: phoneNumber
+
+        val duration = if (durationSec > 0) {
+            "Talked " + com.agency.leadmanager.util.DateUtils.duration(durationSec)
+        } else {
+            when (direction) {
+                "missed" -> "Missed call"
+                "incoming" -> "Not answered"
+                else -> "No answer"
+            }
+        }
+
+        // Tapping the notification body opens the full sheet. Starting an
+        // activity from a notification tap is user-initiated, so it is allowed.
+        val openSheet = PendingIntent.getActivity(
+            context,
+            pendingCallId.toInt(),
+            com.agency.leadmanager.call.PostCallActivity.intentFor(
+                context = context,
+                pendingCallId = pendingCallId,
+                phoneNumber = phoneNumber,
+                durationSec = durationSec,
+                direction = direction,
+                leadId = leadId,
+                leadName = leadName,
+                leadStatus = leadStatus,
+                contactName = displayName,
+            ),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_POST_CALL)
+            .setSmallIcon(R.drawable.ic_stat_call)
+            .setContentTitle(
+                if (isKnownLead) who else "Is this a lead?"
+            )
+            .setContentText(
+                if (isKnownLead) {
+                    "$duration · tap to log the outcome"
+                } else {
+                    "$who · $duration"
+                }
+            )
+            .setStyle(
+                NotificationCompat.BigTextStyle().bigText(
+                    if (isKnownLead) {
+                        "$who — $duration.\nTap to set the status and when to call back."
+                    } else {
+                        "$who — $duration.\nTap Yes to save this number as a lead."
+                    }
+                )
+            )
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(openSheet)
+
+        if (isKnownLead) {
+            builder.addAction(
+                R.drawable.ic_stat_call,
+                "Log outcome",
+                openSheet
+            )
+        } else {
+            // One tap creates the lead, using the phonebook name when we have it.
+            builder.addAction(
+                R.drawable.ic_stat_call,
+                "Yes, add lead",
+                PendingIntent.getBroadcast(
+                    context,
+                    (pendingCallId * 10 + 1).toInt(),
+                    com.agency.leadmanager.call.PostCallActionReceiver.addLeadIntent(
+                        context = context,
+                        pendingCallId = pendingCallId,
+                        phoneNumber = phoneNumber,
+                        suggestedName = suggestedName,
+                    ),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+        }
+
+        builder.addAction(
+            R.drawable.ic_stat_call,
+            if (isKnownLead) "Skip" else "No",
+            PendingIntent.getBroadcast(
+                context,
+                (pendingCallId * 10 + 2).toInt(),
+                com.agency.leadmanager.call.PostCallActionReceiver.dismissIntent(context, pendingCallId),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        )
+
+        notify(postCallNotificationId(pendingCallId), builder.build())
+    }
+
+    fun cancelPostCallPrompt(pendingCallId: Long) {
+        NotificationManagerCompat.from(context).cancel(postCallNotificationId(pendingCallId))
+    }
+
+    /** Brief confirmation after a one-tap lead save. */
+    fun showLeadSaved(name: String, offline: Boolean) {
+        val builder = NotificationCompat.Builder(context, CHANNEL_GENERAL)
+            .setSmallIcon(R.drawable.ic_stat_call)
+            .setContentTitle("Lead saved")
+            .setContentText(
+                if (offline) {
+                    "$name saved on this phone, will sync when you are online"
+                } else {
+                    "$name added"
+                }
+            )
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setTimeoutAfter(8_000)
+
+        notify(ID_LEAD_SAVED, builder.build())
+    }
+
     /** "Call Rajesh Kumar back now" */
     fun showCallbackReminder(
         followUpId: Long,
@@ -107,11 +251,17 @@ class Notifier(private val context: Context) {
 
     companion object {
         const val CHANNEL_CALL_CAPTURE = "call_capture"
+        const val CHANNEL_POST_CALL = "post_call_prompt"
         const val CHANNEL_REMINDERS = "callback_reminders"
         const val CHANNEL_GENERAL = "general_updates"
 
         const val ID_CALL_CAPTURE = 1001
+        private const val ID_LEAD_SAVED = 1002
         private const val REMINDER_ID_BASE = 20_000
+        private const val POST_CALL_ID_BASE = 30_000
+
+        private fun postCallNotificationId(pendingCallId: Long): Int =
+            POST_CALL_ID_BASE + (pendingCallId % 1000).toInt()
 
         /** Called once from Application.onCreate(). */
         fun createChannels(context: Context) {
@@ -125,6 +275,18 @@ class Notifier(private val context: Context) {
             ).apply {
                 description = context.getString(R.string.channel_call_capture_desc)
                 setShowBadge(false)
+            }
+
+            // The post-call prompt is the app's most important moment, so it gets
+            // its own high-importance channel that the user can tune separately.
+            val postCall = NotificationChannel(
+                CHANNEL_POST_CALL,
+                context.getString(R.string.channel_post_call_name),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = context.getString(R.string.channel_post_call_desc)
+                enableVibration(true)
+                setShowBadge(true)
             }
 
             val reminders = NotificationChannel(
@@ -144,7 +306,7 @@ class Notifier(private val context: Context) {
                 description = context.getString(R.string.channel_general_desc)
             }
 
-            manager.createNotificationChannels(listOf(capture, reminders, general))
+            manager.createNotificationChannels(listOf(capture, postCall, reminders, general))
         }
     }
 }

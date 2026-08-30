@@ -56,6 +56,16 @@ import com.agency.leadmanager.ui.theme.LeadManagerTheme
 
 class MainActivity : ComponentActivity() {
 
+    override fun onResume() {
+        super.onResume()
+        AppVisibility.onResumed()
+    }
+
+    override fun onPause() {
+        AppVisibility.onPaused()
+        super.onPause()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -269,6 +279,9 @@ private fun RequestCallPermissions() {
         add(Manifest.permission.READ_PHONE_STATE)
         add(Manifest.permission.READ_CALL_LOG)
         add(Manifest.permission.CALL_PHONE)
+        // Optional, but it turns "Is +91 98765 43210 a lead?" into
+        // "Is Rajesh a lead?" and makes saving a single tap.
+        add(Manifest.permission.READ_CONTACTS)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             add(Manifest.permission.POST_NOTIFICATIONS)
         }
