@@ -1,11 +1,13 @@
 package com.agency.leadmanager.ui.diagnostics
 
 import android.Manifest
+import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
+import android.os.Process
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -210,12 +212,81 @@ class DiagnosticsViewModel(
                 val week = scanner.callsSince(System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000)
                 val latest = scanner.latestCall()
 
+                // Granted-but-withheld: READ_CALL_LOG is hard-restricted, so the
+                // permission can read as granted while the AppOps op is ignored
+                // and the provider quietly returns nothing.
+                val opMode = try {
+                    val ops = context.getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager
+                    ops?.unsafeCheckOpNoThrow(
+                        AppOpsManager.OPSTR_READ_CALL_LOG,
+                        Process.myUid(),
+                        context.packageName,
+                    )
+                } catch (e: Exception) {
+                    null
+                }
+
+                if (opMode != null && opMode != AppOpsManager.MODE_ALLOWED) {
+                    checks += Check(
+                        "Call log data access",
+                        when (opMode) {
+                            AppOpsManager.MODE_IGNORED -> "GRANTED BUT WITHHELD"
+                            AppOpsManager.MODE_ERRORED -> "BLOCKED"
+                            else -> "restricted (mode $opMode)"
+                        },
+                        CheckLevel.FAIL,
+                        "Android is withholding call-log data even though the permission is granted. This happens " +
+                            "when the app is installed outside the Play Store: reading call logs is a restricted " +
+                            "permission and the installer did not allow it. Reinstalling from a different installer, " +
+                            "or installing over USB, restores it.",
+                    )
+                }
+
+                val probe = scanner.probe()
+
                 checks += Check(
                     "Calls visible to the app",
                     "${week.size} in the last 7 days",
                     if (week.isEmpty()) CheckLevel.WARN else CheckLevel.OK,
                     if (week.isEmpty()) "The app can read the call log but sees no recent calls. Make a call, then re-run this check." else null,
                 )
+
+                // The line that separates "platform gave us nothing" from
+                // "platform gave us rows we threw away".
+                checks += when {
+                    probe.outcome != CallLogScanner.Probe.Outcome.OK -> Check(
+                        "Call log read result",
+                        when (probe.outcome) {
+                            CallLogScanner.Probe.Outcome.NULL_CURSOR -> "the phone refused the request"
+                            CallLogScanner.Probe.Outcome.THREW -> "the read failed with an error"
+                            else -> "no permission"
+                        },
+                        CheckLevel.FAIL,
+                        "The call log provider would not answer at all. Show this screen to the office.",
+                    )
+
+                    probe.rawRows == 0 -> Check(
+                        "Call log read result",
+                        "the phone returned 0 rows",
+                        CheckLevel.FAIL,
+                        "Your dialer shows call history, so the log is not empty - the phone is deliberately hiding " +
+                            "it from this app. That is the restricted-permission problem above, not a bug in the app.",
+                    )
+
+                    probe.parsedRows == 0 && probe.blankNumbers > 0 -> Check(
+                        "Call log read result",
+                        "${probe.rawRows} rows, but every number is hidden",
+                        CheckLevel.FAIL,
+                        "The phone returns the calls with the phone number blanked out. Report this to the office - " +
+                            "the app needs a change to handle it.",
+                    )
+
+                    else -> Check(
+                        "Call log read result",
+                        "${probe.rawRows} rows readable, ${probe.parsedRows} usable",
+                        CheckLevel.OK,
+                    )
+                }
 
                 if (latest != null) {
                     checks += Check(
