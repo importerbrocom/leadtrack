@@ -50,6 +50,7 @@ import com.agency.leadmanager.ui.leads.LeadListScreen
 import com.agency.leadmanager.ui.login.LoginScreen
 import com.agency.leadmanager.ui.projects.ProjectDetailScreen
 import com.agency.leadmanager.ui.projects.ProjectListScreen
+import com.agency.leadmanager.ui.diagnostics.DiagnosticsScreen
 import com.agency.leadmanager.ui.settings.SettingsScreen
 import com.agency.leadmanager.ui.team.TeamScreen
 import com.agency.leadmanager.ui.theme.LeadManagerTheme
@@ -95,6 +96,7 @@ object Routes {
     const val FORMS = "forms"
     const val TEAM = "team"
     const val SETTINGS = "settings"
+    const val DIAGNOSTICS = "diagnostics"
 
     fun leadDetail(id: Long) = "lead/$id"
     fun projectDetail(id: Long) = "project/$id"
@@ -251,7 +253,12 @@ private fun AppRoot(initialLeadId: Long?) {
                     onSignedOut = {
                         navController.navigate(Routes.LOGIN) { popUpTo(0) }
                     },
+                    onOpenDiagnostics = { navController.navigate(Routes.DIAGNOSTICS) },
                 )
+            }
+
+            composable(Routes.DIAGNOSTICS) {
+                DiagnosticsScreen(onBack = { navController.popBackStack() })
             }
         }
     }
