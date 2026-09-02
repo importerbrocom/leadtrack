@@ -33,8 +33,8 @@ android {
         // adaptive icons and the modern call-state APIs without shims.
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 4
+        versionName = "1.0.3"
 
         // ---------------------------------------------------------------
         //  POINT THIS AT YOUR OWN SERVER BEFORE BUILDING THE APK.

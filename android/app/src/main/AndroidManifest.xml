@@ -113,10 +113,6 @@
             android:enabled="true"
             android:exported="false" />
 
-        <service
-            android:name=".call.CallCaptureService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
