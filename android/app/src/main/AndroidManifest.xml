@@ -113,6 +113,15 @@
             android:enabled="true"
             android:exported="false" />
 
+        <!--
+          Lets the system watch the call log and wake us when a call is written
+          to it. This is what keeps capture working on phones where MIUI's
+          Autostart setting stops broadcasts being delivered at all.
+        -->
+        <service
+            android:name=".call.CallLogTriggerJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

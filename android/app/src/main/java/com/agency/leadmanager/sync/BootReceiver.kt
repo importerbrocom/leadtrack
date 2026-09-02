@@ -16,6 +16,7 @@ class BootReceiver : BroadcastReceiver() {
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_MY_PACKAGE_REPLACED -> {
                 SyncScheduler.scheduleRecurring(context)
+                com.agency.leadmanager.call.CallLogTriggerJobService.schedule(context)
                 SyncScheduler.catchUpNow(context)
                 SyncScheduler.syncNow(context)
             }

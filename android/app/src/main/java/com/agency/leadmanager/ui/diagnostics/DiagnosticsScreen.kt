@@ -226,6 +226,15 @@ class DiagnosticsViewModel(
                 }
             }
 
+            // ---------------------------------------------------- capture triggers
+            val watching = com.agency.leadmanager.call.CallLogTriggerJobService.isScheduled(context)
+            checks += Check(
+                "Call log watcher",
+                if (watching) "active" else "NOT REGISTERED",
+                if (watching) CheckLevel.OK else CheckLevel.WARN,
+                if (watching) null else "Open and close the app once to re-register it. If it stays off, this phone rejects call-log watching and capture falls back to the 15-minute scan.",
+            )
+
             // ---------------------------------------------------- tracking switch
             val trackingOn = locator.session.callTrackingEnabled()
             checks += Check(

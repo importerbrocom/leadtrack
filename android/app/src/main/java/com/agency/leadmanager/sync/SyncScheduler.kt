@@ -46,6 +46,11 @@ object SyncScheduler {
     fun scheduleRecurring(context: Context) {
         val manager = WorkManager.getInstance(context)
 
+        // Ask the system to watch the call log. This is the primary capture
+        // trigger; the PHONE_STATE broadcast and the periodic scan below are
+        // fallbacks for devices that reject content triggers.
+        com.agency.leadmanager.call.CallLogTriggerJobService.schedule(context)
+
         // Safety net for the outbox, in case a one-off request was dropped.
         manager.enqueueUniquePeriodicWork(
             WORK_SYNC_PERIODIC,
