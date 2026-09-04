@@ -167,6 +167,7 @@ class SettingsViewModel(private val locator: ServiceLocator) : ViewModel() {
 fun SettingsScreen(
     onBack: () -> Unit,
     onSignedOut: () -> Unit,
+    onOpenDiagnostics: () -> Unit = {},
 ) {
     val vm: SettingsViewModel = appViewModel { SettingsViewModel(it) }
     val state by vm.state.collectAsState()
@@ -289,6 +290,20 @@ fun SettingsScreen(
                     enabled = !state.busy,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(if (state.busy) "Syncing…" else "Sync now") }
+            }
+
+            SectionCard(title = "Calls not being recorded?") {
+                Text(
+                    "Checks every setting this phone needs and names the one that is wrong. " +
+                        "Start here if calls are not reaching the office.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                Button(
+                    onClick = onOpenDiagnostics,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Run the check") }
             }
 
             SectionCard(title = "About") {

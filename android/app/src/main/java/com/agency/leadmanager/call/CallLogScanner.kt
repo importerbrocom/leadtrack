@@ -136,6 +136,78 @@ class CallLogScanner(private val context: Context) {
         return calls
     }
 
+    /**
+     * What the call-log provider actually hands back, before any of our own
+     * filtering.
+     *
+     * "No calls visible" has two completely different causes that look identical
+     * from the outside:
+     *
+     *  - the provider returns **no rows** - the platform is withholding the data.
+     *    READ_CALL_LOG is a hard-restricted permission, so when an app is
+     *    installed without the installer whitelisting restricted permissions the
+     *    permission reads as *granted* while the AppOps op is *ignored*, and the
+     *    cursor comes back empty rather than throwing.
+     *
+     *  - the provider returns **rows with NUMBER blanked** - some Xiaomi builds
+     *    redact the column for apps that are not the default dialer. [readCall]
+     *    drops those rows, so the count is zero for an entirely different reason.
+     *
+     * Only the first is a platform restriction; the second is ours to fix.
+     */
+    data class Probe(
+        val outcome: Outcome,
+        val rawRows: Int = 0,
+        val parsedRows: Int = 0,
+        val blankNumbers: Int = 0,
+    ) {
+        enum class Outcome { OK, NO_PERMISSION, NULL_CURSOR, THREW }
+    }
+
+    fun probe(limit: Int = 20): Probe {
+        if (!hasPermission()) return Probe(Probe.Outcome.NO_PERMISSION)
+
+        val projection = arrayOf(
+            CallLog.Calls._ID,
+            CallLog.Calls.NUMBER,
+            CallLog.Calls.TYPE,
+            CallLog.Calls.DATE,
+            CallLog.Calls.DURATION,
+        )
+
+        var raw = 0
+        var parsed = 0
+        var blank = 0
+
+        return try {
+            val cursor = context.contentResolver.query(
+                CallLog.Calls.CONTENT_URI,
+                projection,
+                null,
+                null,
+                "${CallLog.Calls.DATE} DESC LIMIT $limit",
+            ) ?: return Probe(Probe.Outcome.NULL_CURSOR)
+
+            cursor.use {
+                val numberIndex = it.getColumnIndex(CallLog.Calls.NUMBER)
+
+                while (it.moveToNext()) {
+                    raw++
+
+                    val number = if (numberIndex >= 0) it.getString(numberIndex) else null
+                    if (number.isNullOrBlank()) blank++
+
+                    if (it.readCall() != null) parsed++
+                }
+            }
+
+            Probe(Probe.Outcome.OK, rawRows = raw, parsedRows = parsed, blankNumbers = blank)
+        } catch (e: Exception) {
+            Log.e(TAG, "Call log probe failed", e)
+            Probe(Probe.Outcome.THREW)
+        }
+    }
+
     private fun Cursor.readCall(): DeviceCall? {
         val idIndex = getColumnIndex(CallLog.Calls._ID)
         val numberIndex = getColumnIndex(CallLog.Calls.NUMBER)

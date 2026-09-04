@@ -19,8 +19,8 @@ import android.util.Log
  * (missed). We deliberately do not care which: whatever the platform recorded
  * in the call log is the truth.
  *
- * The actual work happens in [CallCaptureService], because a receiver only gets
- * a few seconds of runtime and the call log row may not be written yet.
+ * The actual work happens in [CallCaptureWorker], because a receiver only gets
+ * a few seconds of runtime and the call-log row may not be written yet.
  */
 class CallStateReceiver : BroadcastReceiver() {
 
@@ -69,8 +69,12 @@ class CallStateReceiver : BroadcastReceiver() {
                         val number = lastNumber
                         lastNumber = null
 
-                        Log.d(TAG, "Call ended, handing over to the capture service")
-                        CallCaptureService.captureFinishedCall(context, number)
+                        // Hand off to WorkManager rather than starting a
+                        // foreground service ourselves: Android 12+ forbids an
+                        // app in the background from doing that, and a
+                        // PHONE_STATE broadcast is not exempt.
+                        Log.d(TAG, "Call ended, queueing capture")
+                        CallCaptureWorker.enqueue(context, number)
                     }
                 }
             }

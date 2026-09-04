@@ -50,11 +50,22 @@ import com.agency.leadmanager.ui.leads.LeadListScreen
 import com.agency.leadmanager.ui.login.LoginScreen
 import com.agency.leadmanager.ui.projects.ProjectDetailScreen
 import com.agency.leadmanager.ui.projects.ProjectListScreen
+import com.agency.leadmanager.ui.diagnostics.DiagnosticsScreen
 import com.agency.leadmanager.ui.settings.SettingsScreen
 import com.agency.leadmanager.ui.team.TeamScreen
 import com.agency.leadmanager.ui.theme.LeadManagerTheme
 
 class MainActivity : ComponentActivity() {
+
+    override fun onResume() {
+        super.onResume()
+        AppVisibility.onResumed()
+    }
+
+    override fun onPause() {
+        AppVisibility.onPaused()
+        super.onPause()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,6 +96,7 @@ object Routes {
     const val FORMS = "forms"
     const val TEAM = "team"
     const val SETTINGS = "settings"
+    const val DIAGNOSTICS = "diagnostics"
 
     fun leadDetail(id: Long) = "lead/$id"
     fun projectDetail(id: Long) = "project/$id"
@@ -241,7 +253,12 @@ private fun AppRoot(initialLeadId: Long?) {
                     onSignedOut = {
                         navController.navigate(Routes.LOGIN) { popUpTo(0) }
                     },
+                    onOpenDiagnostics = { navController.navigate(Routes.DIAGNOSTICS) },
                 )
+            }
+
+            composable(Routes.DIAGNOSTICS) {
+                DiagnosticsScreen(onBack = { navController.popBackStack() })
             }
         }
     }
@@ -269,6 +286,9 @@ private fun RequestCallPermissions() {
         add(Manifest.permission.READ_PHONE_STATE)
         add(Manifest.permission.READ_CALL_LOG)
         add(Manifest.permission.CALL_PHONE)
+        // Optional, but it turns "Is +91 98765 43210 a lead?" into
+        // "Is Rajesh a lead?" and makes saving a single tap.
+        add(Manifest.permission.READ_CONTACTS)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             add(Manifest.permission.POST_NOTIFICATIONS)
         }
